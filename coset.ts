@@ -1,11 +1,13 @@
 import { Wallet, Contract } from "ethers";
 
 import ABI from "./data/ABI.json";
-import type { IRead, IUpdate } from "./types";
+import type { IRead, IUpdate, UpdateOptions } from "./types";
 import { stableStringify } from "./utils/stringify";
 
 export class Coset {
     public wallet: Wallet;
+    public spent: number = 0;
+    public spendingLimit: number = Infinity;
 
     /**
      * Creates an instance of the Coset SDK.
@@ -20,20 +22,48 @@ export class Coset {
      * Performs a data update on the oracle smart contract. This method incurs gas fees.
      * @returns {IUpdate} Object containing status of the update operation, transaction hash if successful, and error message if failed.
      */
-    async update(oracleAddress: string): Promise<IUpdate> {
-        return {
-            status: true,
-            spent: {
-                gasFee: 0,
-                platformFee: 0,
-                dataProviderFee: 0,
-            }
+    async update(
+        oracleAddress: string,
+        options: UpdateOptions = {
+            force: false,
+        }
+    ): Promise<IUpdate> {
+        const emptySpent = {
+            total: 0,
+            gasFee: 0,
+            platformFee: 0,
+            dataProviderFee: 0,
         };
+
+        if (!oracleAddress) {
+            return {
+                status: false,
+                message: "Oracle address is required",
+                spent: emptySpent,
+            };
+        }
+
+        if (this.spent >= this.spendingLimit && !options.force) {
+            return {
+                status: false,
+                message: "Spending limit exceeded",
+                spent: emptySpent,
+            };
+        }
+
+        const res = {
+            status: true,
+            spent: emptySpent,
+        };
+
+        this.spent += res.spent.total;
+
+        return res;
     }
 
     /**
      * Performs an optional data update if needed. Checks if an update is needed by comparing current time with `recommendedUpdateDuration` variable in oracle smart contract.
-     * 
+     *
      * If an update is needed, it performs the update, otherwise does nothing. This method may incur gas fees if an update is performed.
      * @param oracleAddress Address of the oracle smart contract
      * @returns {null | IUpdate} Returns null if no update was needed, otherwise returns the result of the update operation.
@@ -92,6 +122,15 @@ export class Coset {
             data,
             status: true,
         };
+    }
+
+    async getUpdateCost(oracleAddress: string): Promise<number> {
+        return 0;
+    }
+
+    async setSpendingLimit(_spendingLimit: number): Promise<void> {
+        this.spendingLimit = _spendingLimit;
+        return;
     }
 
     private oracle(address: string) {

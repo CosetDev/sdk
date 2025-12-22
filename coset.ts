@@ -1,8 +1,11 @@
 import { Wallet, Contract } from "ethers";
 
-import ABI from "./data/ABI.json";
-import type { IRead, IUpdate, UpdateOptions } from "./types";
 import { stableStringify } from "./utils/stringify";
+import type { IRead, IUpdate, UpdateOptions } from "./types";
+
+// ABIs
+import OracleABI from "./data/OracleABI.json";
+import OracleFactoryABI from "./data/OracleFactoryABI.json";
 
 export class Coset {
     public wallet: Wallet;
@@ -50,6 +53,8 @@ export class Coset {
                 spent: emptySpent,
             };
         }
+
+        
 
         const res = {
             status: true,
@@ -134,6 +139,10 @@ export class Coset {
     }
 
     private oracle(address: string) {
-        return new Contract(address, stableStringify(ABI), this.wallet);
+        return new Contract(address, stableStringify(OracleABI), this.wallet);
+    }
+
+    private oracleFactory(address: string) {
+        return new Contract(address, stableStringify(OracleFactoryABI), this.wallet);
     }
 }

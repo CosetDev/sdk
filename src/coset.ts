@@ -1,11 +1,8 @@
 import { Wallet, Contract } from "ethers";
+import { Oracle } from "@coset-dev/contracts";
 
 import { stableStringify } from "./utils/stringify";
 import type { IRead, IUpdate, UpdateOptions } from "./types";
-
-// ABIs
-import OracleABI from "./data/OracleABI.json";
-import OracleFactoryABI from "./data/OracleFactoryABI.json";
 
 export class Coset {
     public wallet: Wallet;
@@ -14,10 +11,11 @@ export class Coset {
 
     /**
      * Creates an instance of the Coset SDK.
-     * @param privateKey Private key of your wallet. This wallet will be used to sign transactions and pay HTTP 402 payments automatically. Be sure to have balance in your wallet.
-     * @param wallet Optional ethers.js Wallet instance. If provided, the SDK will use this wallet instead of creating a new one with the private key.
+     * @param oracleAddress Address of the oracle smart contract
+     * @param privateKey Private key of the wallet to be used for signing transactions
+     * @param wallet Optional ethers.js Wallet instance. If provided, it will be used instead of creating a new one with the private key.
      */
-    constructor(privateKey: string, wallet?: Wallet) {
+    constructor(oracleAddress: string, privateKey: string, wallet?: Wallet) {
         this.wallet = wallet ?? new Wallet(privateKey);
     }
 
@@ -53,8 +51,6 @@ export class Coset {
                 spent: emptySpent,
             };
         }
-
-        
 
         const res = {
             status: true,
@@ -139,10 +135,10 @@ export class Coset {
     }
 
     private oracle(address: string) {
-        return new Contract(address, stableStringify(OracleABI), this.wallet);
+        return new Contract(address, stableStringify([]), this.wallet);
     }
 
     private oracleFactory(address: string) {
-        return new Contract(address, stableStringify(OracleFactoryABI), this.wallet);
+        return new Contract(address, stableStringify([]), this.wallet);
     }
 }

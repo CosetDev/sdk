@@ -1,22 +1,26 @@
-import { Wallet, Contract } from "ethers";
-import { Oracle } from "@coset-dev/contracts";
-
-import { stableStringify } from "./utils/stringify";
+import { isHexString, Wallet } from "ethers";
 import type { IRead, IUpdate, UpdateOptions } from "./types";
+import { Oracle as OracleContract, factories } from "@coset-dev/contracts";
 
 export class Coset {
     public wallet: Wallet;
+
     public spent: number = 0;
+
     public spendingLimit: number = Infinity;
 
+    private oracle: OracleContract;
+
     /**
-     * Creates an instance of the Coset SDK.
+     * @param privateKey The private key string
      * @param oracleAddress Address of the oracle smart contract
-     * @param privateKey Private key of the wallet to be used for signing transactions
-     * @param wallet Optional ethers.js Wallet instance. If provided, it will be used instead of creating a new one with the private key.
      */
-    constructor(oracleAddress: string, privateKey: string, wallet?: Wallet) {
-        this.wallet = wallet ?? new Wallet(privateKey);
+    constructor(privateKey: string, oracleAddress: string) {
+        if (isHexString(oracleAddress) === false) {
+            throw new Error("Invalid oracle address");
+        }
+        this.wallet = new Wallet(privateKey);
+        this.oracle = factories.Oracle__factory.connect(oracleAddress, this.wallet);
     }
 
     /**
@@ -24,7 +28,6 @@ export class Coset {
      * @returns {IUpdate} Object containing status of the update operation, transaction hash if successful, and error message if failed.
      */
     async update(
-        oracleAddress: string,
         options: UpdateOptions = {
             force: false,
         }
@@ -35,14 +38,6 @@ export class Coset {
             platformFee: 0,
             dataProviderFee: 0,
         };
-
-        if (!oracleAddress) {
-            return {
-                status: false,
-                message: "Oracle address is required",
-                spent: emptySpent,
-            };
-        }
 
         if (this.spent >= this.spendingLimit && !options.force) {
             return {
@@ -66,12 +61,11 @@ export class Coset {
      * Performs an optional data update if needed. Checks if an update is needed by comparing current time with `recommendedUpdateDuration` variable in oracle smart contract.
      *
      * If an update is needed, it performs the update, otherwise does nothing. This method may incur gas fees if an update is performed.
-     * @param oracleAddress Address of the oracle smart contract
      * @returns {null | IUpdate} Returns null if no update was needed, otherwise returns the result of the update operation.
      */
-    async optionalUpdate(oracleAddress: string): Promise<null | IUpdate> {
-        if (await this.isUpdateNeeded(oracleAddress)) {
-            await this.update(oracleAddress);
+    async optionalUpdate(): Promise<null | IUpdate> {
+        if (await this.isUpdateNeeded()) {
+            await this.update();
         }
 
         return null;
@@ -81,13 +75,12 @@ export class Coset {
      * Returns if a data update is needed.
      *
      * Compares current date with `recommendedUpdateDuration` variable in oracle smart contract.
-     * @param oracleAddress Address of the oracle smart contract
      * @returns {boolean} Boolean whether an update is needed
      */
-    async isUpdateNeeded(oracleAddress: string): Promise<boolean> {
+    async isUpdateNeeded(): Promise<boolean> {
         const [recommendedUpdateDuration, lastUpdate] = await Promise.all([
-            this.oracle(oracleAddress).recommendedUpdateDuration(),
-            this.oracle(oracleAddress).lastUpdate(),
+            Number(await this.oracle.recommendedUpdateDuration()),
+            Number(await this.oracle.lastUpdateTimestamp()),
         ]);
 
         if (!recommendedUpdateDuration) return false;
@@ -98,18 +91,10 @@ export class Coset {
 
     /**
      * Read data from oracle. Free to call and returns if a data update is recommended.
-     * @param oracleAddress Address of the oracle smart contract
      * @returns {IRead} Object containing oracle data, status, last update timestamp, recommended update duration and whether an update is recommended. If `status` is false, error message is also included.
      */
-    async read(oracleAddress: string): Promise<IRead> {
-        if (!oracleAddress)
-            return {
-                data: null,
-                status: false,
-                message: "Oracle address is required",
-            };
-
-        const data = await this.oracle(oracleAddress).data();
+    async read(): Promise<IRead> {
+        const data = await this.oracle.getData();
 
         if (!data) {
             return {
@@ -125,20 +110,12 @@ export class Coset {
         };
     }
 
-    async getUpdateCost(oracleAddress: string): Promise<number> {
+    async getUpdateCost(): Promise<number> {
         return 0;
     }
 
     async setSpendingLimit(_spendingLimit: number): Promise<void> {
         this.spendingLimit = _spendingLimit;
         return;
-    }
-
-    private oracle(address: string) {
-        return new Contract(address, stableStringify([]), this.wallet);
-    }
-
-    private oracleFactory(address: string) {
-        return new Contract(address, stableStringify([]), this.wallet);
     }
 }

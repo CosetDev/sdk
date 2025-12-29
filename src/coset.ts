@@ -1,4 +1,4 @@
-import { isHexString, Wallet } from "ethers";
+import { formatUnits, isHexString, Wallet } from "ethers";
 import type { IRead, IUpdate, UpdateOptions } from "./types";
 import { Oracle as OracleContract, factories } from "@coset-dev/contracts";
 
@@ -37,6 +37,7 @@ export class Coset {
             gasFee: 0,
             platformFee: 0,
             dataProviderFee: 0,
+            data: null,
         };
 
         if (this.spent >= this.spendingLimit && !options.force) {
@@ -50,7 +51,10 @@ export class Coset {
         const res = {
             status: true,
             spent: emptySpent,
+            data: null,
         };
+
+        // TODO: Send request to node with x402/fetch
 
         this.spent += res.spent.total;
 
@@ -94,7 +98,7 @@ export class Coset {
      * @returns {IRead} Object containing oracle data, status, last update timestamp, recommended update duration and whether an update is recommended. If `status` is false, error message is also included.
      */
     async read(): Promise<IRead> {
-        const data = await this.oracle.getData();
+        const data = await this.oracle.getDataWithoutCheck();
 
         if (!data) {
             return {
@@ -110,8 +114,31 @@ export class Coset {
         };
     }
 
+    /**
+     * Read data from oracle. If recommended update duration has passed, tries to perform an update before reading.
+     * @returns {IRead} Object containing oracle data, status, last update timestamp, recommended update duration and whether an update is recommended. If `status` is false, error message is also included.
+     */
+    async strictRead(): Promise<IRead> {
+        try {
+            const data = await this.oracle.getData();
+            return {
+                data,
+                status: true,
+            }
+        } catch {
+            const { data } = await this.update();
+            return {
+                data,
+                status: true,
+            }
+        }
+    }
+
+    /**
+     * @returns Update cost in stable token units
+     */
     async getUpdateCost(): Promise<number> {
-        return 0;
+        return +formatUnits(await this.oracle.dataUpdatePrice(), 6);
     }
 
     async setSpendingLimit(_spendingLimit: number): Promise<void> {

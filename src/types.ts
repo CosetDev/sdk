@@ -15,6 +15,7 @@ export interface IUpdate {
         platformFee: number;
         dataProviderFee: number;
     };
+    data?: any;
     tx?: string;
     message?: string;
 }

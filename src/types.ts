@@ -1,14 +1,13 @@
 export interface IRead {
-    data: any;
-    status: boolean;
+    data: Record<string, any>;
     message?: string;
-    lastUpdate?: number;
-    recommendedUpdateDuration?: number;
+    lastUpdateTimestamp?: number;
+    lastUpdateFormatted?: string;
     isUpdateRecommended?: boolean;
+    recommendedUpdateDuration?: number;
 }
 
 export interface IUpdate {
-    status: boolean;
     spent: {
         total: number;
         gasFee: number;
@@ -22,4 +21,9 @@ export interface IUpdate {
 
 export type UpdateOptions = {
     force?: boolean;
+};
+
+export enum Networks {
+    MANTLE = "mantle-mainnet",
+    MANTLE_TESTNET = "mantle-testnet",
 }

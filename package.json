@@ -1,13 +1,14 @@
 {
-    "name": "coset",
-    "version": "0.0.1",
+    "namespace": "@coset-dev",
+    "name": "@coset-dev/sdk",
+    "version": "1.0.0",
     "type": "module",
-    "main": "./dist/index.js",
-    "types": "./dist/index.d.ts",
+    "main": "./dist/coset.js",
+    "types": "./dist/coset.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "types": "./dist/coset.d.ts",
+            "import": "./dist/coset.js"
         }
     },
     "files": [
@@ -18,11 +19,30 @@
         "prepublishOnly": "npm run build",
         "test": "jest"
     },
+    "authors": [
+        {
+            "name": "Halil Beycan"
+        },
+        {
+            "name": "Ozan Andaç"
+        }
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/CosetDev/sdk",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/CosetDev/sdk.git"
+    },
+    "bugs": {
+        "url": "https://github.com/CosetDev/sdk/issues"
+    },
     "dependencies": {
-        "@coset-dev/contracts": "^1.0.4",
-        "ethers": "^6.16.0",
+        "@x402/core": "^2.1.0",
+        "@x402/evm": "^2.1.0",
+        "@x402/fetch": "^2.1.0",
         "json-stable-stringify": "^1.3.0",
-        "ts-node": "^10.9.2"
+        "ts-node": "^10.9.2",
+        "viem": "^2.43.3"
     },
     "devDependencies": {
         "@types/jest": "^30.0.0",

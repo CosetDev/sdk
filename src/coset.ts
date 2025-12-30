@@ -1,26 +1,95 @@
-import { formatUnits, isHexString, Wallet } from "ethers";
-import type { IRead, IUpdate, UpdateOptions } from "./types";
-import { Oracle as OracleContract, factories } from "@coset-dev/contracts";
+import { SettleResponse } from "@x402/core/types";
+import { wrapFetchWithPayment } from "@x402/fetch";
+import { x402Client, x402HTTPClient } from "@x402/core/client";
+import { registerExactEvmScheme } from "@x402/evm/exact/client";
+import { PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
+
+import type { IRead, IUpdate, Networks, UpdateOptions } from "./types";
+
+export * from "./types";
 
 export class Coset {
-    public wallet: Wallet;
-
     public spent: number = 0;
 
     public spendingLimit: number = Infinity;
 
-    private oracle: OracleContract;
+    private node: string = "http://localhost:5001/";
+
+    private call: string = `${this.node}call/`;
+
+    private oracleAddress: `0x${string}`;
+
+    private networkName: Networks;
+
+    private signer: PrivateKeyAccount;
+
+    private client: x402Client;
+
+    private httpClient: x402HTTPClient;
+
+    private fetchWithPayment: ReturnType<typeof wrapFetchWithPayment>;
 
     /**
-     * @param privateKey The private key string
+     * @param networkName Name of the blockchain network (e.g., "mantle-testnet")
      * @param oracleAddress Address of the oracle smart contract
+     * @param privateKey The private key string
      */
-    constructor(privateKey: string, oracleAddress: string) {
-        if (isHexString(oracleAddress) === false) {
+    constructor(networkName: Networks, oracleAddress: `0x${string}`, privateKey: `0x${string}`) {
+        if (this.isHexString(oracleAddress) === false) {
             throw new Error("Invalid oracle address");
         }
-        this.wallet = new Wallet(privateKey);
-        this.oracle = factories.Oracle__factory.connect(oracleAddress, this.wallet);
+        this.call = `${this.call}${oracleAddress}/`;
+        if (!privateKey.startsWith("0x") || privateKey.length !== 66) {
+            privateKey = `0x${privateKey}`;
+        }
+        this.networkName = networkName;
+        this.oracleAddress = oracleAddress;
+        this.client = new x402Client();
+        this.httpClient = new x402HTTPClient(this.client);
+        this.signer = privateKeyToAccount(privateKey);
+        registerExactEvmScheme(this.client, { signer: this.signer });
+        this.fetchWithPayment = wrapFetchWithPayment(fetch, this.client);
+    }
+
+    private isHexString(value: string): boolean {
+        return /^0x[0-9a-fA-F]+$/.test(value);
+    }
+
+    private async apiCall(
+        path: string,
+        options = {
+            method: "GET",
+            headers: {},
+        }
+    ) {
+        try {
+            const res = await fetch(`${this.call}${path}`, {
+                method: options.method,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...options.headers,
+                },
+            });
+
+            if (!res.ok) {
+                return Promise.reject({
+                    data: await res.json(),
+                    message: `API request failed with status ${res.status}`,
+                });
+            }
+
+            try {
+                return await res.json();
+            } catch (error) {
+                return Promise.reject({
+                    message: "Failed to parse JSON response",
+                });
+            }
+        } catch (error) {
+            return Promise.reject({
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
     }
 
     /**
@@ -37,28 +106,81 @@ export class Coset {
             gasFee: 0,
             platformFee: 0,
             dataProviderFee: 0,
-            data: null,
         };
 
         if (this.spent >= this.spendingLimit && !options.force) {
-            return {
-                status: false,
+            return Promise.reject({
                 message: "Spending limit exceeded",
                 spent: emptySpent,
-            };
+            });
         }
 
-        const res = {
-            status: true,
-            spent: emptySpent,
-            data: null,
-        };
+        try {
+            this.client.onBeforePaymentCreation(async context => {
+                const balance = await this.getBalance();
+                if (balance.units < context.selectedRequirements.amount) {
+                    return {
+                        abort: true,
+                        reason: "Insufficient token balance for payment",
+                    };
+                }
+            });
 
-        // TODO: Send request to node with x402/fetch
+            const response = await this.fetchWithPayment(`${this.node}update`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    networkName: this.networkName,
+                    oracleAddress: this.oracleAddress,
+                }),
+            });
 
-        this.spent += res.spent.total;
+            const data = await response.json();
 
-        return res;
+            if (!response.ok) {
+                return Promise.reject({
+                    message: `Update failed with status ${response.status}`,
+                    spent: emptySpent,
+                    data,
+                });
+            }
+
+            const paymentResponse = this.httpClient.getPaymentSettleResponse(name =>
+                response.headers.get(name)
+            ) as SettleResponse & {
+                requirements?: Record<string, any>;
+            };
+
+            if (!paymentResponse.success) {
+                return Promise.reject({
+                    message: paymentResponse.errorReason,
+                    spent: emptySpent,
+                    data,
+                });
+            }
+
+            const priceDetails = paymentResponse.requirements?.extra?.priceDetails;
+
+            emptySpent.total = Number(priceDetails.totalCost || 0);
+            emptySpent.gasFee = Number(priceDetails.methodGasFee?.usdc || 0);
+            emptySpent.dataProviderFee = Number(priceDetails.providerAmount || 0);
+            emptySpent.platformFee = Number(priceDetails.updatePrice) - emptySpent.dataProviderFee;
+
+            this.spent += emptySpent.total;
+
+            return Promise.resolve({
+                spent: emptySpent,
+                data: data.data,
+                tx: data.transactionHash,
+            });
+        } catch (error: any) {
+            return Promise.reject({
+                message: error.message || "Update failed",
+                spent: emptySpent,
+            });
+        }
     }
 
     /**
@@ -75,6 +197,20 @@ export class Coset {
         return null;
     }
 
+    private async getUpdateMetadata(): Promise<{
+        recommendedUpdateDuration: number;
+        lastUpdateTimestamp: number;
+    }> {
+        return await this.apiCall("get-update-metadata");
+    }
+
+    private async getBalance(): Promise<{
+        units: string;
+        amount: number;
+    }> {
+        return await this.apiCall("get-balance?sender=" + this.signer.address);
+    }
+
     /**
      * Returns if a data update is needed.
      *
@@ -82,63 +218,66 @@ export class Coset {
      * @returns {boolean} Boolean whether an update is needed
      */
     async isUpdateNeeded(): Promise<boolean> {
-        const [recommendedUpdateDuration, lastUpdate] = await Promise.all([
-            Number(await this.oracle.recommendedUpdateDuration()),
-            Number(await this.oracle.lastUpdateTimestamp()),
-        ]);
-
-        if (!recommendedUpdateDuration) return false;
-
-        const currentTime = Math.floor(Date.now() / 1000);
-        return currentTime - lastUpdate >= recommendedUpdateDuration;
+        const { recommendedUpdateDuration, lastUpdateTimestamp } = await this.getUpdateMetadata();
+        return Math.floor(Date.now() / 1000) - lastUpdateTimestamp >= recommendedUpdateDuration;
     }
 
     /**
      * Read data from oracle. Free to call and returns if a data update is recommended.
+     * @param strict If true, tries to perform an update before reading if recommended update duration has passed.
      * @returns {IRead} Object containing oracle data, status, last update timestamp, recommended update duration and whether an update is recommended. If `status` is false, error message is also included.
      */
-    async read(): Promise<IRead> {
-        const data = await this.oracle.getDataWithoutCheck();
+    async read(strict = false): Promise<IRead> {
+        try {
+            const [data, { recommendedUpdateDuration, lastUpdateTimestamp }] = await Promise.all([
+                this.apiCall(strict ? "get-data" : "get-data-without-check"),
+                this.getUpdateMetadata(),
+            ]);
 
-        if (!data) {
+            const currentTime = Math.floor(Date.now() / 1000);
+            const isUpdateRecommended = recommendedUpdateDuration
+                ? currentTime - lastUpdateTimestamp >= recommendedUpdateDuration
+                : false;
+
             return {
-                data: null,
-                status: false,
-                message: "No data found",
+                data,
+                lastUpdateTimestamp,
+                isUpdateRecommended,
+                recommendedUpdateDuration,
+                lastUpdateFormatted: new Date(lastUpdateTimestamp * 1000).toISOString(),
             };
+        } catch (error: any) {
+            return error;
         }
-
-        return {
-            data,
-            status: true,
-        };
     }
 
     /**
      * Read data from oracle. If recommended update duration has passed, tries to perform an update before reading.
      * @returns {IRead} Object containing oracle data, status, last update timestamp, recommended update duration and whether an update is recommended. If `status` is false, error message is also included.
      */
-    async strictRead(): Promise<IRead> {
+    async strictRead(
+        options: UpdateOptions = {
+            force: false,
+        }
+    ): Promise<IRead> {
         try {
-            const data = await this.oracle.getData();
-            return {
-                data,
-                status: true,
-            }
+            return await this.read(true);
         } catch {
-            const { data } = await this.update();
+            const { data } = await this.update(options);
             return {
                 data,
-                status: true,
-            }
+            };
         }
     }
 
     /**
      * @returns Update cost in stable token units
      */
-    async getUpdateCost(): Promise<number> {
-        return +formatUnits(await this.oracle.dataUpdatePrice(), 6);
+    async getUpdateCost(): Promise<{
+        units: string;
+        amount: number;
+    }> {
+        return await this.apiCall("get-data-update-price");
     }
 
     async setSpendingLimit(_spendingLimit: number): Promise<void> {

@@ -1,17 +1,17 @@
 import dotenv from "dotenv";
 
-import { Coset, Networks } from "../src/coset";
+import { Coset, Networks, PaymentToken } from "../src/coset";
 
 dotenv.config({ path: ".env.test" });
 
-const TEST_ORACLE = "0xfa44948f4FE39C888cC70540054E7Ab50f48a2C5";
+const TEST_ORACLE = "0xe8F71fE8bf0B11beF1C4179202c5c7c06E2eEcF6";
 const USER_PRIVATE_KEY = process.env.USER_PRIVATE_KEY as `0x${string}`;
 
 describe("Coset SDK", () => {
     let coset: Coset;
 
     beforeAll(() => {
-        coset = new Coset(Networks.MANTLE_TESTNET, TEST_ORACLE, USER_PRIVATE_KEY);
+        coset = new Coset(Networks.MANTLE_TESTNET, PaymentToken.CST, TEST_ORACLE, USER_PRIVATE_KEY);
     });
 
     it("get data update cost", async () => {

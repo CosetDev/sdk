@@ -24,6 +24,11 @@ export type UpdateOptions = {
 };
 
 export enum Networks {
-    MANTLE = "mantle-mainnet",
+    MANTLE = "mantle",
     MANTLE_TESTNET = "mantle-testnet",
+}
+
+export enum PaymentToken {
+    USDC = "USDC",
+    CST = "CST",
 }

@@ -1,7 +1,7 @@
 {
     "namespace": "@coset-dev",
     "name": "@coset-dev/sdk",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "type": "module",
     "main": "./dist/coset.js",
     "types": "./dist/coset.d.ts",

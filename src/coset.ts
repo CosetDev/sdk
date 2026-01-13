@@ -4,9 +4,20 @@ import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 
-import type { IRead, IUpdate, Networks, UpdateOptions } from "./types";
+import { IRead, IUpdate, Networks, PaymentToken, UpdateOptions } from "./types";
 
 export * from "./types";
+
+const paymentTokenMap = {
+    [Networks.MANTLE]: {
+        USDC: "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9",
+        CST: "0x77A90090C9bcc45940E18657fB82Fb70A2D494fd",
+    },
+    [Networks.MANTLE_TESTNET]: {
+        USDC: "0x05856b07544044873616d390Cc50c785fe8a8885",
+        CST: "0x77A90090C9bcc45940E18657fB82Fb70A2D494fd",
+    },
+};
 
 export class Coset {
     public spent: number = 0;
@@ -21,6 +32,8 @@ export class Coset {
 
     private networkName: Networks;
 
+    private paymentToken: `0x${string}`;
+
     private signer: PrivateKeyAccount;
 
     private client: x402Client;
@@ -31,10 +44,16 @@ export class Coset {
 
     /**
      * @param networkName Name of the blockchain network (e.g., "mantle-testnet")
+     * @param paymentToken Payment token to be used for updates
      * @param oracleAddress Address of the oracle smart contract
      * @param privateKey The private key string
      */
-    constructor(networkName: Networks, oracleAddress: `0x${string}`, privateKey: `0x${string}`) {
+    constructor(
+        networkName: Networks,
+        paymentToken: PaymentToken,
+        oracleAddress: `0x${string}`,
+        privateKey: `0x${string}`
+    ) {
         if (this.isHexString(oracleAddress) === false) {
             throw new Error("Invalid oracle address");
         }
@@ -49,6 +68,7 @@ export class Coset {
         this.signer = privateKeyToAccount(privateKey);
         registerExactEvmScheme(this.client, { signer: this.signer });
         this.fetchWithPayment = wrapFetchWithPayment(fetch, this.client);
+        this.paymentToken = paymentTokenMap[this.networkName][paymentToken] as `0x${string}`;
     }
 
     private isHexString(value: string): boolean {
@@ -117,7 +137,7 @@ export class Coset {
 
         try {
             this.client.onBeforePaymentCreation(async context => {
-                const balance = await this.getBalance();
+                const balance = await this.getBalance(this.paymentToken);
                 if (balance.units < context.selectedRequirements.amount) {
                     return {
                         abort: true,
@@ -133,6 +153,7 @@ export class Coset {
                 },
                 body: JSON.stringify({
                     networkName: this.networkName,
+                    paymentToken: this.paymentToken,
                     oracleAddress: this.oracleAddress,
                 }),
             });
@@ -164,7 +185,7 @@ export class Coset {
             const priceDetails = paymentResponse.requirements?.extra?.priceDetails;
 
             emptySpent.total = Number(priceDetails.totalCost || 0);
-            emptySpent.gasFee = Number(priceDetails.methodGasFee?.usdc || 0);
+            emptySpent.gasFee = Number(priceDetails.methodGasFee?.token || 0);
             emptySpent.dataProviderFee = Number(priceDetails.providerAmount || 0);
             emptySpent.platformFee = Number(priceDetails.updatePrice) - emptySpent.dataProviderFee;
 
@@ -204,11 +225,11 @@ export class Coset {
         return await this.apiCall("get-update-metadata");
     }
 
-    private async getBalance(): Promise<{
+    private async getBalance(currency: string): Promise<{
         units: string;
         amount: number;
     }> {
-        return await this.apiCall("get-balance?sender=" + this.signer.address);
+        return await this.apiCall("get-balance?sender=" + this.signer.address + `&currency=${currency}`);
     }
 
     /**

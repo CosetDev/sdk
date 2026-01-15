@@ -24,7 +24,7 @@ export class Coset {
 
     public spendingLimit: number = Infinity;
 
-    private node: string = "http://localhost:5001/";
+    private node: string = "https://node1.coset.dev/";
 
     private call: string = `${this.node}call/`;
 
@@ -47,17 +47,29 @@ export class Coset {
      * @param paymentToken Payment token to be used for updates
      * @param oracleAddress Address of the oracle smart contract
      * @param privateKey The private key string
+     * @param nodeEndpoint The node endpoint
      */
     constructor(
         networkName: Networks,
         paymentToken: PaymentToken,
         oracleAddress: `0x${string}`,
-        privateKey: `0x${string}`
+        privateKey: `0x${string}`,
+        nodeEndpoint?: string
     ) {
         if (this.isHexString(oracleAddress) === false) {
             throw new Error("Invalid oracle address");
         }
-        this.call = `${this.call}${oracleAddress}/`;
+        if (nodeEndpoint) {
+            try {
+                Boolean(new URL(nodeEndpoint));
+            } catch {
+                throw new Error("Invalid node endpoint");
+            }
+            this.node = nodeEndpoint;
+            this.call = `${this.node}${oracleAddress}/`;
+        } else {
+            this.call = `${this.call}${oracleAddress}/`;
+        }
         if (!privateKey.startsWith("0x") || privateKey.length !== 66) {
             privateKey = `0x${privateKey}`;
         }

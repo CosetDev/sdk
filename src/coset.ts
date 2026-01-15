@@ -61,15 +61,19 @@ export class Coset {
         }
         if (nodeEndpoint) {
             try {
-                Boolean(new URL(nodeEndpoint));
+                // eslint-disable-next-line no-new
+                new URL(nodeEndpoint);
             } catch {
                 throw new Error("Invalid node endpoint");
             }
             this.node = nodeEndpoint;
-            this.call = `${this.node}${oracleAddress}/`;
-        } else {
-            this.call = `${this.call}${oracleAddress}/`;
         }
+
+        if (!this.node.endsWith("/")) {
+            this.node = `${this.node}/`;
+        }
+
+        this.call = `${this.node}call/${oracleAddress}/`;
         if (!privateKey.startsWith("0x") || privateKey.length !== 66) {
             privateKey = `0x${privateKey}`;
         }

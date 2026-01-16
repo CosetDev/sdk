@@ -1,9 +1,9 @@
 {
     "namespace": "@coset-dev",
     "name": "@coset-dev/sdk",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "type": "module",
-    "main": "./dist/cjs/coset.js",
+    "main": "./dist/cjs/coset.cjs",
     "module": "./dist/esm/coset.js",
     "types": "./dist/src/coset.d.ts",
     "exports": {
@@ -14,12 +14,12 @@
             },
             "require": {
                 "types": "./dist/src/coset.d.ts",
-                "default": "./dist/cjs/coset.js"
+                "default": "./dist/cjs/coset.cjs"
             }
         },
         "./node": {
             "types": "./dist/src/coset.d.ts",
-            "default": "./dist/cjs/coset.js"
+            "default": "./dist/cjs/coset.cjs"
         },
         "./browser": {
             "types": "./dist/src/coset.d.ts",

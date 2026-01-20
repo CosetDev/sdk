@@ -4,7 +4,7 @@ import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 
-import { IRead, IUpdate, Networks, NetworkTokenMap, UpdateOptions } from "./types";
+import { IRead, IUpdate, Networks, PaymentToken, UpdateOptions } from "./types";
 
 export * from "./types";
 
@@ -18,7 +18,7 @@ const paymentTokenMap = {
         CST: "0x77A90090C9bcc45940E18657fB82Fb70A2D494fd",
     },
     [Networks.CRONOS]: {
-        USDC: undefined,
+        USDC: "0xf951eC28187D9E5Ca673Da8FE6757E6f0Be5F77C",
         CST: "0x6e0a0ba0e4e7433e65e6b4a12860baf43b0b8f06",
     },
     [Networks.CRONOS_TESTNET]: {
@@ -27,7 +27,7 @@ const paymentTokenMap = {
     },
 };
 
-export class Coset<T extends Networks> {
+export class Coset {
     public spent: number = 0;
 
     public spendingLimit: number = Infinity;
@@ -58,8 +58,8 @@ export class Coset<T extends Networks> {
      * @param nodeEndpoint The node endpoint
      */
     constructor(
-        networkName: T,
-        paymentToken: NetworkTokenMap[T],
+        networkName: Networks,
+        paymentToken: PaymentToken,
         oracleAddress: `0x${string}`,
         privateKey: `0x${string}`,
         nodeEndpoint?: string,
@@ -165,7 +165,7 @@ export class Coset<T extends Networks> {
         try {
             this.client.onBeforePaymentCreation(async context => {
                 const balance = await this.getBalance(this.paymentToken);
-                if (balance.units < context.selectedRequirements.amount) {
+                if (Number(balance.units) < Number(context.selectedRequirements.amount)) {
                     return {
                         abort: true,
                         reason: "Insufficient token balance for payment",

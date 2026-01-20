@@ -34,10 +34,3 @@ export enum PaymentToken {
     USDC = "USDC",
     CST = "CST",
 }
-
-export type NetworkTokenMap = {
-    [Networks.MANTLE]: PaymentToken.USDC | PaymentToken.CST;
-    [Networks.MANTLE_TESTNET]: PaymentToken.USDC | PaymentToken.CST;
-    [Networks.CRONOS]: PaymentToken.CST;
-    [Networks.CRONOS_TESTNET]: PaymentToken.USDC | PaymentToken.CST;
-};

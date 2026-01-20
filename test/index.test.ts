@@ -8,7 +8,7 @@ const TEST_ORACLE = "0xfdF1DF1F5208982a47ce579cB5a7a4DA3126DEE1";
 const USER_PRIVATE_KEY = process.env.USER_PRIVATE_KEY as `0x${string}`;
 
 describe("Coset SDK", () => {
-    let coset: Coset<Networks.MANTLE_TESTNET>;
+    let coset: Coset;
 
     beforeAll(() => {
         coset = new Coset(Networks.MANTLE_TESTNET, PaymentToken.CST, TEST_ORACLE, USER_PRIVATE_KEY);

@@ -17,6 +17,14 @@ const paymentTokenMap = {
         USDC: "0x05856b07544044873616d390Cc50c785fe8a8885",
         CST: "0x77A90090C9bcc45940E18657fB82Fb70A2D494fd",
     },
+    [Networks.CRONOS]: {
+        USDC: "0xc21223249CA28397B4B6541dfFaEcC539BfF0c59",
+        CST: "0x6e0a0ba0e4e7433e65e6b4a12860baf43b0b8f06",
+    },
+    [Networks.CRONOS_TESTNET]: {
+        USDC: "0xb1BF5CA11a4C4f95ab46B496757E1DBb1397eC0a",
+        CST: "0x6e0a0ba0e4e7433e65e6b4a12860baf43b0b8f06",
+    },
 };
 
 export class Coset {

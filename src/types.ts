@@ -26,6 +26,8 @@ export type UpdateOptions = {
 export enum Networks {
     MANTLE = "mantle",
     MANTLE_TESTNET = "mantle-testnet",
+    CRONOS = "cronos",
+    CRONOS_TESTNET = "cronos-testnet",
 }
 
 export enum PaymentToken {

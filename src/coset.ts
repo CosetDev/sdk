@@ -1,9 +1,7 @@
-import { SettleResponse } from "@x402/core/types";
+import { x402Client } from "@x402/core/client";
 import { wrapFetchWithPayment } from "@x402/fetch";
-import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
-
 import { IRead, IUpdate, Networks, PaymentToken, UpdateOptions } from "./types";
 
 export * from "./types";
@@ -46,8 +44,6 @@ export class Coset {
 
     private client: x402Client;
 
-    private httpClient: x402HTTPClient;
-
     private fetchWithPayment: ReturnType<typeof wrapFetchWithPayment>;
 
     /**
@@ -88,7 +84,6 @@ export class Coset {
         this.networkName = networkName;
         this.oracleAddress = oracleAddress;
         this.client = new x402Client();
-        this.httpClient = new x402HTTPClient(this.client);
         this.signer = privateKeyToAccount(privateKey);
         registerExactEvmScheme(this.client, { signer: this.signer });
         this.fetchWithPayment = wrapFetchWithPayment(fetch, this.client);
@@ -195,21 +190,7 @@ export class Coset {
                 });
             }
 
-            const paymentResponse = this.httpClient.getPaymentSettleResponse(name =>
-                response.headers.get(name),
-            ) as SettleResponse & {
-                requirements?: Record<string, any>;
-            };
-
-            if (!paymentResponse.success) {
-                return Promise.reject({
-                    message: paymentResponse.errorReason,
-                    spent: emptySpent,
-                    data,
-                });
-            }
-
-            const priceDetails = paymentResponse.requirements?.extra?.priceDetails;
+            const priceDetails = data.priceDetails;
 
             emptySpent.total = Number(priceDetails.totalCost || 0);
             emptySpent.gasFee = Number(priceDetails.methodGasFee?.token || 0);

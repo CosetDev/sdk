@@ -4,7 +4,7 @@ import { x402Client, x402HTTPClient } from "@x402/core/client";
 import { registerExactEvmScheme } from "@x402/evm/exact/client";
 import { PrivateKeyAccount, privateKeyToAccount } from "viem/accounts";
 
-import { IRead, IUpdate, Networks, PaymentToken, UpdateOptions } from "./types";
+import { IRead, IUpdate, Networks, NetworkTokenMap, UpdateOptions } from "./types";
 
 export * from "./types";
 
@@ -18,7 +18,7 @@ const paymentTokenMap = {
         CST: "0x77A90090C9bcc45940E18657fB82Fb70A2D494fd",
     },
     [Networks.CRONOS]: {
-        USDC: "0xc21223249CA28397B4B6541dfFaEcC539BfF0c59",
+        USDC: undefined,
         CST: "0x6e0a0ba0e4e7433e65e6b4a12860baf43b0b8f06",
     },
     [Networks.CRONOS_TESTNET]: {
@@ -27,7 +27,7 @@ const paymentTokenMap = {
     },
 };
 
-export class Coset {
+export class Coset<T extends Networks> {
     public spent: number = 0;
 
     public spendingLimit: number = Infinity;
@@ -58,11 +58,11 @@ export class Coset {
      * @param nodeEndpoint The node endpoint
      */
     constructor(
-        networkName: Networks,
-        paymentToken: PaymentToken,
+        networkName: T,
+        paymentToken: NetworkTokenMap[T],
         oracleAddress: `0x${string}`,
         privateKey: `0x${string}`,
-        nodeEndpoint?: string
+        nodeEndpoint?: string,
     ) {
         if (this.isHexString(oracleAddress) === false) {
             throw new Error("Invalid oracle address");
@@ -93,6 +93,9 @@ export class Coset {
         registerExactEvmScheme(this.client, { signer: this.signer });
         this.fetchWithPayment = wrapFetchWithPayment(fetch, this.client);
         this.paymentToken = paymentTokenMap[this.networkName][paymentToken] as `0x${string}`;
+        if (!this.paymentToken) {
+            throw new Error(`Payment token ${paymentToken} is not supported on network ${networkName}`);
+        }
     }
 
     private isHexString(value: string): boolean {
@@ -104,7 +107,7 @@ export class Coset {
         options = {
             method: "GET",
             headers: {},
-        }
+        },
     ) {
         try {
             const res = await fetch(`${this.call}${path}`, {
@@ -143,7 +146,7 @@ export class Coset {
     async update(
         options: UpdateOptions = {
             force: false,
-        }
+        },
     ): Promise<IUpdate> {
         const emptySpent = {
             total: 0,
@@ -193,7 +196,7 @@ export class Coset {
             }
 
             const paymentResponse = this.httpClient.getPaymentSettleResponse(name =>
-                response.headers.get(name)
+                response.headers.get(name),
             ) as SettleResponse & {
                 requirements?: Record<string, any>;
             };
@@ -303,7 +306,7 @@ export class Coset {
     async strictRead(
         options: UpdateOptions = {
             force: false,
-        }
+        },
     ): Promise<IRead> {
         try {
             return await this.read(true);
